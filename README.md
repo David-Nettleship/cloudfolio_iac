@@ -1,0 +1,1 @@
+A serverless investment portfolio tracker app hosted in AWS - WIP!
