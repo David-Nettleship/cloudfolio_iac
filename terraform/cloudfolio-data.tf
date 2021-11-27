@@ -3,6 +3,12 @@ provider "aws" {
   region  = "eu-west-2"
 }
 
+data "archive_file" "cloudfolio-data-func" {
+  type        = "zip"
+  source_file = "../cloudfolio-data.py"
+  output_path = "output/cloudfolio-data.zip"
+}
+
 resource "aws_dynamodb_table" "cloudfolio-data" {
   name           = "cloudfolio-data"
   billing_mode   = "PROVISIONED"
@@ -41,8 +47,8 @@ resource "aws_dynamodb_table" "cloudfolio-values" {
   }
 }
 
-resource "aws_iam_role" "iam_for_lambda" {
-  name = "iam_for_lambda"
+resource "aws_iam_role" "cloudfolio-data-lambda-iam-role" {
+  name = "cf-data-lambda-role"
 
   assume_role_policy = <<EOF
 {
@@ -60,17 +66,47 @@ resource "aws_iam_role" "iam_for_lambda" {
 }
 EOF
   inline_policy {
-      name = "UpdateVisitorCountDB"
+    name = "UpdateVisitorCountDB"
 
-      policy = jsonencode({
-        Version = "2012-10-17"
-        Statement = [
-          {
-            Action   = ["dynamodb:Scan", "dynamodb:PutItem"]
-            Effect   = "Allow"
-            Resource = [aws_dynamodb_table.cloudfolio-data.arn, aws_dynamodb_table.cloudfolio-values.arn]
-          },
-        ]
-      })
-    }
+    policy = jsonencode({
+      Version = "2012-10-17"
+      Statement = [
+        {
+          Action   = ["dynamodb:Scan", "dynamodb:PutItem"]
+          Effect   = "Allow"
+          Resource = [aws_dynamodb_table.cloudfolio-data.arn, aws_dynamodb_table.cloudfolio-values.arn]
+        },
+      ]
+    })
+  }
+}
+
+resource "aws_lambda_function" "cloudfolio-data-lambda" {
+  filename         = "output/cloudfolio-data.zip"
+  function_name    = "cloudfolio-data-lambda"
+  source_code_hash = filebase64sha256("output/cloudfolio-data.zip")
+  role             = aws_iam_role.cloudfolio-data-lambda-iam-role.arn
+  handler          = "cloudfolio-data.lambda_handler"
+  timeout          = 600
+  runtime          = "python3.9"
+}
+
+resource "aws_cloudwatch_event_rule" "daily_cron" {
+  name                = "daily_cron"
+  description         = "Fires every day @00:00 UTC"
+  schedule_expression = "cron(0 0 * * ? *)"
+}
+
+resource "aws_cloudwatch_event_target" "check_daily_cron" {
+  rule      = aws_cloudwatch_event_rule.daily_cron.name
+  target_id = "cloudfolio-data-lambda"
+  arn       = aws_lambda_function.cloudfolio-data-lambda.arn
+}
+
+resource "aws_lambda_permission" "allow_cloudwatch_to_call_check_daily_cron" {
+  statement_id  = "AllowExecutionFromCloudWatch"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.cloudfolio-data-lambda.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.daily_cron.arn
 }
