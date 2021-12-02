@@ -11,7 +11,7 @@ data "archive_file" "cloudfolio-data-func" {
 
 resource "aws_dynamodb_table" "cloudfolio-data" {
   name           = "cloudfolio-data"
-  billing_mode   = "PROVISIONED"
+  billing_mode   = "PAY_PER_REQUEST"
   read_capacity  = 20
   write_capacity = 20
   hash_key       = "Ticker"
@@ -30,7 +30,7 @@ resource "aws_dynamodb_table" "cloudfolio-data" {
 
 resource "aws_dynamodb_table" "cloudfolio-values" {
   name           = "cloudfolio-values"
-  billing_mode   = "PROVISIONED"
+  billing_mode   = "PAY_PER_REQUEST"
   read_capacity  = 20
   write_capacity = 20
   hash_key       = "Date"
