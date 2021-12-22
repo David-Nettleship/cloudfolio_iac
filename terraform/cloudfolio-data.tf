@@ -81,6 +81,11 @@ EOF
   }
 }
 
+resource "aws_iam_role_policy_attachment" "basic" {
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+  role       = aws_iam_role.cloudfolio-data-lambda-iam-role.name
+}
+
 resource "aws_lambda_function" "cloudfolio-data-lambda" {
   filename         = "output/cloudfolio-data.zip"
   function_name    = "cloudfolio-data-lambda"
